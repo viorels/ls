@@ -11,7 +11,7 @@ def list_all(patterns, item_filter, item_sort, expand_dirs):
     return [item_meta(path, item_filter, item_sort, expand_dirs) for path in paths]
 
 def expand_pattern(pattern):
-    return glob.glob(pattern) # TODO expand ~ and vars with os.path.expanduser()/expandvars()
+    return glob.glob(os.path.expanduser(pattern))
 
 def list_dir(path, item_filter, item_sort, expand_dirs=False):
     content = ([item_meta(os.path.join(path, item),
