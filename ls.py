@@ -29,7 +29,7 @@ def item_meta(item, item_filter, item_sort, expand_dirs=True):
         if expand_dirs:
             # list content of this folder but not the ones on next level
             try:
-                meta['content'] = list_dir(item, item_filter, item_sort)
+                meta['content'] = list_dir(item, item_filter, item_sort, expand_dirs=False)
             except OSError, e:
                 meta['error'] = e
     elif os.path.islink(item):
@@ -39,28 +39,30 @@ def item_meta(item, item_filter, item_sort, expand_dirs=True):
     return meta 
 
 def display_simple(content):
-    show_title = len(content) > 1
+    several_paths = len(content) > 1
     for path in content:
-        if show_title and path.get('content'):
-            print "\n" + get_title(path)
-        else:
-            print get_name_and_symbol(path)
+        if several_paths:
+            if path.get('content'):
+                print "\n" + get_title(path)
+            else:
+                print get_name(path)
         if path.get('error'):
             print >>sys.stderr, "%s\n" % path['error']
         else:
             for item in path.get('content', []):
-                print get_name_and_symbol(item)
+                print get_name(item)
 
 def display_long(content):
     pass
 
 def get_title(item):
-    item_symbol = {'directory': ':', 'link': '@'} 
-    return item['name'] + item_symbol.get(item['type'], '')
+    return get_name_with_symbol(item, {'directory': ':', 'link': '@'})
 
-def get_name_and_symbol(item):
-    type_symbol = {'directory': '/', 'link': '@'}
-    return item['name'] + type_symbol.get(item['type'], '')
+def get_name(item):
+    return get_name_with_symbol(item, {'directory': '/', 'link': '@'})
+
+def get_name_with_symbol(item, symbols):
+    return item['name'] + symbols.get(item['type'], '')
 
 def filter_none(items):
     return items
