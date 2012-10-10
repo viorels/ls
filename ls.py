@@ -1,31 +1,33 @@
 #!/usr/bin/python2.7
 
-import argparse
+import sys
 import os
 import glob
+import argparse
 
 def list_all(patterns, item_filter, item_sort):
     paths = sum([expand_pattern(pattern) for pattern in patterns], [])
-    return [list_path(path) for path in paths]
+    return [item_meta(path) for path in paths]
 
 def expand_pattern(pattern):
     return glob.glob(pattern) # TODO expand ~ and vars with os.path.expanduser()/expandvars()
 
-def list_path(path, expand_dirs=True):
-    return item_meta(path)
-
-def list_dir(path, expand_dirs=True):
-    return [item_meta(os.path.join(path, item), list=expand_dirs) 
+def list_dir(path, expand_dirs=False):
+    return [item_meta(os.path.join(path, item), expand_dirs)
             for item in os.listdir(path)]
 
-def item_meta(item, list=True):
-    meta = {'name': os.path.basename(item)}
+def item_meta(item, expand_dirs=True):
+    meta = {'name': os.path.basename(os.path.abspath(item))}
     if os.path.isfile(item):
         meta['type'] = 'file'
     elif os.path.isdir(item):
         meta['type'] = 'directory'
-        if list:
-            meta['content'] = list_dir(item, expand_dirs=False)
+        if expand_dirs:
+            # list content of this folder but not the ones on next level
+            try:
+                meta['content'] = list_dir(item)
+            except OSError, e:
+                meta['error'] = e
     elif os.path.islink(item):
         meta['type'] = 'link'
     else:
@@ -38,8 +40,15 @@ def display_simple(content):
     for path in content:
         if show_title:
             print get_title(path)
-        for item in path.get('content', []):
-            print item['name'] + file_type_symbol.get(item['type'], '')
+        if path.get('error'):
+            print >>sys.stderr, "%s\n" % path['error']
+        else:
+            for item in path.get('content', []):
+                print item['name'] + file_type_symbol.get(item['type'], '')
+        print ""
+
+def display_long(content):
+    pass
 
 def get_title(item):
     item_symbol = {'directory': ':', 'link': '@'} 
@@ -50,6 +59,12 @@ def filter_none(items):
 
 def filter_hidden(items):
     return [item for item in items if not item['name'].startswith('.')]
+
+def sort_alphanum(items):
+    pass
+
+def sort_mtime(items):
+    pass
 
 def parse_args():
     parser = argparse.ArgumentParser(
