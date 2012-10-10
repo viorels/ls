@@ -6,9 +6,9 @@ import glob
 import argparse
 import operator
 
-def list_all(patterns, item_filter, item_sort):
+def list_all(patterns, item_filter, item_sort, expand_dirs):
     paths = sum([expand_pattern(pattern) for pattern in patterns], [])
-    return [item_meta(path, item_filter, item_sort) for path in paths]
+    return [item_meta(path, item_filter, item_sort, expand_dirs) for path in paths]
 
 def expand_pattern(pattern):
     return glob.glob(pattern) # TODO expand ~ and vars with os.path.expanduser()/expandvars()
@@ -39,17 +39,17 @@ def item_meta(item, item_filter, item_sort, expand_dirs=True):
     return meta 
 
 def display_simple(content):
-    file_type_symbol = {'directory': '/', 'link': '@'}
     show_title = len(content) > 1
     for path in content:
-        if show_title:
-            print get_title(path)
+        if show_title and path.get('content'):
+            print "\n" + get_title(path)
+        else:
+            print get_name_and_symbol(path)
         if path.get('error'):
             print >>sys.stderr, "%s\n" % path['error']
         else:
             for item in path.get('content', []):
-                print item['name'] + file_type_symbol.get(item['type'], '')
-        print ""
+                print get_name_and_symbol(item)
 
 def display_long(content):
     pass
@@ -57,6 +57,10 @@ def display_long(content):
 def get_title(item):
     item_symbol = {'directory': ':', 'link': '@'} 
     return item['name'] + item_symbol.get(item['type'], '')
+
+def get_name_and_symbol(item):
+    type_symbol = {'directory': '/', 'link': '@'}
+    return item['name'] + type_symbol.get(item['type'], '')
 
 def filter_none(items):
     return items
@@ -86,11 +90,18 @@ def parse_args():
     parser.add_argument(
         '-r', '--reverse', dest='reverse', action='store_const', const=True,
         default=False, help='reverse order while sorting')
+    parser.add_argument(
+        '-d', '--directory', dest='directory', action='store_const', const=True,
+        default=False, help='list directory entries instead of contents, '
+                            'and do not dereference symbolic links')
 
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
     sort = args.sort if not args.reverse else lambda items: reversed(args.sort(items))
-    display_simple(list_all(args.pattern, item_filter=args.filter, item_sort=sort))
+    display_simple(list_all(args.pattern,
+                            item_filter=args.filter,
+                            item_sort=sort,
+                            expand_dirs=not args.directory))
 
