@@ -4,19 +4,23 @@ import sys
 import os
 import glob
 import argparse
+import operator
 
 def list_all(patterns, item_filter, item_sort):
     paths = sum([expand_pattern(pattern) for pattern in patterns], [])
-    return [item_meta(path) for path in paths]
+    return [item_meta(path, item_filter, item_sort) for path in paths]
 
 def expand_pattern(pattern):
     return glob.glob(pattern) # TODO expand ~ and vars with os.path.expanduser()/expandvars()
 
-def list_dir(path, expand_dirs=False):
-    return [item_meta(os.path.join(path, item), expand_dirs)
-            for item in os.listdir(path)]
+def list_dir(path, item_filter, item_sort, expand_dirs=False):
+    content = ([item_meta(os.path.join(path, item),
+                          item_filter, item_sort,
+                          expand_dirs=expand_dirs)
+                for item in os.listdir(path)])
+    return item_sort(item_filter(content))
 
-def item_meta(item, expand_dirs=True):
+def item_meta(item, item_filter, item_sort, expand_dirs=True):
     meta = {'name': os.path.basename(os.path.abspath(item))}
     if os.path.isfile(item):
         meta['type'] = 'file'
@@ -25,7 +29,7 @@ def item_meta(item, expand_dirs=True):
         if expand_dirs:
             # list content of this folder but not the ones on next level
             try:
-                meta['content'] = list_dir(item)
+                meta['content'] = list_dir(item, item_filter, item_sort)
             except OSError, e:
                 meta['error'] = e
     elif os.path.islink(item):
@@ -61,7 +65,7 @@ def filter_hidden(items):
     return [item for item in items if not item['name'].startswith('.')]
 
 def sort_alphanum(items):
-    pass
+    return sorted(items, key=operator.itemgetter('name'))
 
 def sort_mtime(items):
     pass
@@ -70,17 +74,23 @@ def parse_args():
     parser = argparse.ArgumentParser(
         prog="ls", description="List information about the FILEs "
                                "(the current directory by default).")
+    parser.set_defaults(
+        filter=filter_hidden,
+        sort=sort_alphanum)
     parser.add_argument(
         'pattern', metavar='path', nargs='*', default=[os.getcwd()],
         help='path(s) to list content of')
     parser.add_argument(
         '-a', '--all', dest='filter', action='store_const', const=filter_none,
-        default=filter_hidden, help='do not ignore entries starting with .')
+        help='do not ignore entries starting with .')
+    parser.add_argument(
+        '-r', '--reverse', dest='reverse', action='store_const', const=True,
+        default=False, help='reverse order while sorting')
 
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
-#    print args.accumulate(args.paths)
-    display_simple(list_all(args.pattern, item_filter=args.filter, item_sort=None))
+    sort = args.sort if not args.reverse else lambda items: reversed(args.sort(items))
+    display_simple(list_all(args.pattern, item_filter=args.filter, item_sort=sort))
 
