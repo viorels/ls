@@ -19,11 +19,15 @@ def list_dir(path, item_filter, item_sort, expand_dirs=False):
     content = ([item_meta(os.path.join(path, item),
                           item_filter, item_sort,
                           expand_dirs=expand_dirs)
-                for item in os.listdir(path)])
+                for item in ['.', '..'] + os.listdir(path)])
     return item_sort(item_filter(content))
 
 def item_meta(item, item_filter, item_sort, expand_dirs=True):
-    meta = {'name': os.path.basename(os.path.abspath(item))}
+    if item.endswith('/'):
+        name = os.path.dirname(item)
+    else:
+        name = os.path.basename(item)
+    meta = {'name': name}
     if os.path.isdir(item):
         meta['type'] = 'directory'
         meta['stat'] = os.stat(item)
@@ -41,6 +45,7 @@ def item_meta(item, item_filter, item_sort, expand_dirs=True):
         meta['stat'] = os.stat(item)
     else:
         meta['type'] = '' # mount/socket ?
+        meta['stat'] = os.stat(item)
     return meta 
 
 def display_simple(content):
