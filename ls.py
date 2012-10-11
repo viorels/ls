@@ -117,17 +117,17 @@ def filter_none(items):
 def filter_hidden(items):
     return [item for item in items if not item['name'].startswith('.')]
 
-def sort_none(items):
-    return items
+def sort_none(items, reverse):
+    return items if not reverse else reversed(items)
 
-def sort_alphanum(items):
-    return sorted(items, key=operator.itemgetter('name'))
+def sort_alphanum(items, reverse):
+    return sorted(items, key=operator.itemgetter('name'), reverse=reverse)
 
-def sort_time(items):
-    return sorted(items, key=lambda item: item['stat'].st_mtime, reverse=True)
+def sort_time(items, reverse):
+    return sorted(items, key=lambda item: item['stat'].st_mtime, reverse=not reverse)
 
-def sort_size(items):
-    return sorted(items, key=lambda item: item['stat'].st_size, reverse=True)
+def sort_size(items, reverse):
+    return sorted(items, key=lambda item: item['stat'].st_size, reverse=not reverse)
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -167,7 +167,7 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    sort = args.sort if not args.reverse else lambda items: reversed(args.sort(items))
+    sort = lambda items: args.sort(items, reverse=args.reverse)
     args.display(list_all(args.pattern,
                           item_filter=args.filter,
                           item_sort=sort,
