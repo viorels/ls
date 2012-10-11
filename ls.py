@@ -48,37 +48,26 @@ def item_meta(item, item_filter, item_sort, expand_dirs=True):
         meta['stat'] = os.stat(item)
     return meta 
 
-def display_simple(content):
-    several_paths = len(content) > 1
-    for path in content:
-        if several_paths:
-            if path.get('content'):
+def display(content, display_items, list_entry):
+    if list_entry:
+        display_items(content)
+    else:
+        several_paths = len(content) > 1
+        for path in content:
+            if several_paths:
                 print "\n" + get_title(path)
+            if path.get('error'):
+                print >>sys.stderr, "%s\n" % path['error']
             else:
-                print get_name(path)
-        if path.get('error'):
-            print >>sys.stderr, "%s\n" % path['error']
-        else:
-            for item in path.get('content', []):
-                print get_name(item)
+                display_items(path.get('content', []))
 
-def display_long(content):
-    several_paths = len(content) > 1
-    for path in content:
-        if several_paths:
-            if path.get('content'):
-                print "\n" + get_title(path)
-            else:
-                print get_name(path)
-        if path.get('error'):
-            print >>sys.stderr, "%s\n" % path['error']
-        else:
-            path_content = path.get('content', [])
-            fmt, widths = format_long(path_content)
-            for item in path_content:
-                print fmt.format(**dict(item, **widths))
+def display_items_short(content):
+    for item in content:
+        print get_name(item)
 
-def format_long(content):
+def display_items_long(content):
+    if not content:
+        return
     item_type_letter = {'directory': 'd', 'link': 'l'} # TODO: get more info from stat.st_mode
     for item in content:
         stat = item['stat']
@@ -102,7 +91,8 @@ def format_long(content):
                   for key in variable_width_fields)
     fmt = ("{mode} {nlink: >{nlink_width}} {user: >{user_width}} {group: >{group_width}} "
            "{size: >{size_width}} {time: >{time_width}} {name_with_symbol}")
-    return fmt, widths
+    for item in content:
+        print fmt.format(**dict(item, **widths))
                                     
 def get_perms_text(mode):
     octal = oct(mode)[-3:]
@@ -151,7 +141,7 @@ def parse_args():
     parser.set_defaults(
         filter=filter_hidden,
         sort=sort_alphanum,
-        display=display_simple)
+        display=display_items_short)
     parser.add_argument(
         'pattern', metavar='path', nargs='*', default=[os.getcwd()],
         help='path(s) to list content of')
@@ -159,7 +149,7 @@ def parse_args():
         '-a', '--all', dest='filter', action='store_const', const=filter_none,
         help='do not ignore entries starting with .')
     parser.add_argument(
-        '-l', dest='display', action='store_const', const=display_long,
+        '-l', dest='display', action='store_const', const=display_items_long,
         help='use a long listing format')
     parser.add_argument(
         '-d', '--directory', dest='directory', action='store_const', const=True,
@@ -183,8 +173,10 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     sort = lambda items: args.sort(items, reverse=args.reverse)
-    args.display(list_all(args.pattern,
-                          item_filter=args.filter,
-                          item_sort=sort,
-                          expand_dirs=not args.directory))
+    display(list_all(args.pattern,
+                     item_filter=args.filter,
+                     item_sort=sort,
+                     expand_dirs=not args.directory),
+            display_items=args.display,
+            list_entry=args.directory)
 
