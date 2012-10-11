@@ -86,8 +86,14 @@ def format_long(content):
         item['mode'] = (item_type_letter.get(item['type'], '-') +
                         get_perms_text(stat.st_mode))
         item['nlink'] = stat.st_nlink
-        item['user'] = pwd.getpwuid(stat.st_uid).pw_name
-        item['group'] = grp.getgrgid(stat.st_gid).gr_name
+        try:
+            item['user'] = pwd.getpwuid(stat.st_uid).pw_name
+        except KeyError, e:
+            item['user'] = stat.st_uid
+        try:
+            item['group'] = grp.getgrgid(stat.st_gid).gr_name
+        except KeyError, e:
+            item['group'] = stat.st_gid
         item['size'] = stat.st_size
         item['time'] = time.strftime('%b %d %Y %H:%M', time.localtime(stat.st_mtime))
 
@@ -113,8 +119,12 @@ def get_title(item):
     return item['path'] + symbols.get(item['type'], '')
 
 def get_name(item):
-    symbols = {'directory': '/', 'link': '@'}
-    return item['name'] + symbols.get(item['type'], '')
+    symbol = ''
+    if item['type'] == 'directory' and not item['name'].endswith('/'):
+        symbol = '/'
+    elif item['type'] == 'link':
+        symbol = '@'
+    return item['name'] + symbol
 
 def filter_none(items):
     return items
