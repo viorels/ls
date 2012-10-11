@@ -27,7 +27,7 @@ def item_meta(item, item_filter, item_sort, expand_dirs=True):
         name = os.path.dirname(item)
     else:
         name = os.path.basename(item)
-    meta = {'name': name}
+    meta = {'name': name, 'path': item}
     if os.path.isdir(item):
         meta['type'] = 'directory'
         meta['stat'] = os.stat(item)
@@ -82,6 +82,7 @@ def format_long(content):
     item_type_letter = {'directory': 'd', 'link': 'l'} # TODO: get more info from stat.st_mode
     for item in content:
         stat = item['stat']
+        item['name_with_symbol'] = get_name(item)
         item['mode'] = (item_type_letter.get(item['type'], '-') +
                         get_perms_text(stat.st_mode))
         item['nlink'] = stat.st_nlink
@@ -94,7 +95,7 @@ def format_long(content):
     widths = dict(("%s_width" % key, max(len(unicode(item[key])) for item in content))
                   for key in variable_width_fields)
     fmt = ("{mode} {nlink: >{nlink_width}} {user: >{user_width}} {group: >{group_width}} "
-           "{size: >{size_width}} {time: >{time_width}} {name}")
+           "{size: >{size_width}} {time: >{time_width}} {name_with_symbol}")
     return fmt, widths
                                     
 def get_perms_text(mode):
@@ -108,12 +109,11 @@ def get_perms_text(mode):
     return perms
 
 def get_title(item):
-    return get_name_with_symbol(item, {'directory': ':', 'link': '@'})
+    symbols = {'directory': ':', 'link': '@'}
+    return item['path'] + symbols.get(item['type'], '')
 
 def get_name(item):
-    return get_name_with_symbol(item, {'directory': '/', 'link': '@'})
-
-def get_name_with_symbol(item, symbols):
+    symbols = {'directory': '/', 'link': '@'}
     return item['name'] + symbols.get(item['type'], '')
 
 def filter_none(items):
