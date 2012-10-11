@@ -5,6 +5,8 @@ import os
 import glob
 import argparse
 import operator
+import pwd, grp
+import time
 
 def list_all(patterns, item_filter, item_sort, expand_dirs):
     paths = sum([expand_pattern(pattern) for pattern in patterns], [])
@@ -22,10 +24,9 @@ def list_dir(path, item_filter, item_sort, expand_dirs=False):
 
 def item_meta(item, item_filter, item_sort, expand_dirs=True):
     meta = {'name': os.path.basename(os.path.abspath(item))}
-    if os.path.isfile(item):
-        meta['type'] = 'file'
-    elif os.path.isdir(item):
+    if os.path.isdir(item):
         meta['type'] = 'directory'
+        meta['stat'] = os.stat(item)
         if expand_dirs:
             # list content of this folder but not the ones on next level
             try:
@@ -34,6 +35,10 @@ def item_meta(item, item_filter, item_sort, expand_dirs=True):
                 meta['error'] = e
     elif os.path.islink(item):
         meta['type'] = 'link'
+        meta['stat'] = os.lstat(item)
+    elif os.path.isfile(item):
+        meta['type'] = 'file'
+        meta['stat'] = os.stat(item)
     else:
         meta['type'] = '' # mount/socket ?
     return meta 
@@ -53,7 +58,49 @@ def display_simple(content):
                 print get_name(item)
 
 def display_long(content):
-    pass
+    several_paths = len(content) > 1
+    for path in content:
+        if several_paths:
+            if path.get('content'):
+                print "\n" + get_title(path)
+            else:
+                print get_name(path)
+        if path.get('error'):
+            print >>sys.stderr, "%s\n" % path['error']
+        else:
+            path_content = path.get('content', [])
+            fmt, widths = format_long(path_content)
+            for item in path_content:
+                print fmt.format(**dict(item, **widths))
+
+def format_long(content):
+    item_type_letter = {'directory': 'd', 'link': 'l'} # TODO: get more info from stat.st_mode
+    for item in content:
+        stat = item['stat']
+        item['mode'] = (item_type_letter.get(item['type'], '-') +
+                        get_perms_text(stat.st_mode))
+        item['nlink'] = stat.st_nlink
+        item['user'] = pwd.getpwuid(stat.st_uid).pw_name
+        item['group'] = grp.getgrgid(stat.st_gid).gr_name
+        item['size'] = stat.st_size
+        item['time'] = time.strftime('%b %d %Y %H:%M', time.localtime(stat.st_mtime))
+
+    variable_width_fields = 'nlink user group size time'.split()
+    widths = dict(("%s_width" % key, max(len(unicode(item[key])) for item in content))
+                  for key in variable_width_fields)
+    fmt = ("{mode} {nlink: >{nlink_width}} {user: >{user_width}} {group: >{group_width}} "
+           "{size: >{size_width}} {time: >{time_width}} {name}")
+    return fmt, widths
+                                    
+def get_perms_text(mode):
+    octal = oct(mode)[-3:]
+    perms = ''
+    for octdigit in octal:
+        intdigit = int(octdigit)
+        perms += 'r' if intdigit & 4 else '-'
+        perms += 'w' if intdigit & 2 else '-'
+        perms += 'x' if intdigit & 1 else '-'
+    return perms
 
 def get_title(item):
     return get_name_with_symbol(item, {'directory': ':', 'link': '@'})
@@ -82,13 +129,17 @@ def parse_args():
                                "(the current directory by default).")
     parser.set_defaults(
         filter=filter_hidden,
-        sort=sort_alphanum)
+        sort=sort_alphanum,
+        display=display_simple)
     parser.add_argument(
         'pattern', metavar='path', nargs='*', default=[os.getcwd()],
         help='path(s) to list content of')
     parser.add_argument(
         '-a', '--all', dest='filter', action='store_const', const=filter_none,
         help='do not ignore entries starting with .')
+    parser.add_argument(
+        '-l', dest='display', action='store_const', const=display_long,
+        help='use a long listing format')
     parser.add_argument(
         '-r', '--reverse', dest='reverse', action='store_const', const=True,
         default=False, help='reverse order while sorting')
@@ -102,8 +153,8 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     sort = args.sort if not args.reverse else lambda items: reversed(args.sort(items))
-    display_simple(list_all(args.pattern,
-                            item_filter=args.filter,
-                            item_sort=sort,
-                            expand_dirs=not args.directory))
+    args.display(list_all(args.pattern,
+                          item_filter=args.filter,
+                          item_sort=sort,
+                          expand_dirs=not args.directory))
 
