@@ -117,11 +117,17 @@ def filter_none(items):
 def filter_hidden(items):
     return [item for item in items if not item['name'].startswith('.')]
 
+def sort_none(items):
+    return items
+
 def sort_alphanum(items):
     return sorted(items, key=operator.itemgetter('name'))
 
-def sort_mtime(items):
-    pass
+def sort_time(items):
+    return sorted(items, key=lambda item: item['stat'].st_mtime, reverse=True)
+
+def sort_size(items):
+    return sorted(items, key=lambda item: item['stat'].st_size, reverse=True)
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -141,12 +147,21 @@ def parse_args():
         '-l', dest='display', action='store_const', const=display_long,
         help='use a long listing format')
     parser.add_argument(
-        '-r', '--reverse', dest='reverse', action='store_const', const=True,
-        default=False, help='reverse order while sorting')
-    parser.add_argument(
         '-d', '--directory', dest='directory', action='store_const', const=True,
         default=False, help='list directory entries instead of contents, '
                             'and do not dereference symbolic links')
+    parser.add_argument(
+        '-U', dest='sort', action='store_const', const=sort_none,
+        help='do not sort; list entries in directory order')
+    parser.add_argument(
+        '-S', dest='sort', action='store_const', const=sort_size,
+        help='sort by file size')
+    parser.add_argument(
+        '-t', dest='sort', action='store_const', const=sort_time,
+        help='sort by modification time, newest first')
+    parser.add_argument(
+        '-r', '--reverse', dest='reverse', action='store_const', const=True,
+        default=False, help='reverse order while sorting')
 
     return parser.parse_args()
 
